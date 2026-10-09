@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Flappy Bird 🐥</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:linear-gradient(#70c5ce,#d0f4f7)}
+  canvas{display:block;margin:auto;background:linear-gradient(#4ec0ca,#ffffff)}
+  #restart,#start,#pause{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#ff4757;color:#fff;border:none;font-size:22px;
+    padding:15px 40px;border-radius:12px;cursor:pointer;display:none;
+    box-shadow:0 0 10px rgba(0,0,0,.3)
+  }
+  #start{background:#2ecc71}
+  #pause{
+    left:auto;top:20px;right:20px;transform:none;padding:10px 25px;font-size:20px;
+    border-radius:8px;background:#3498db;display:block;
+  }
+  #restart:hover{background:#e84118}
+  #start:hover{background:#27ae60}
+  #pause:hover{background:#2980b9}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<button id="start">Tap to Start 🐥</button>
+<button id="restart">Restart 🔁</button>
+<button id="pause">⏸️</button>
+
+<script>
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+
+const bird={x:100,y:canvas.height/2,width:45,height:35,vel:0,gravity:0.5,lift:-9};
+let pipes=[],frame=0,score=0,bestScore=localStorage.getItem("bestScore")||0,gameOver=false,started=false,paused=false;
+const birdColor="#ffeb3b";
+
+function drawBird(){
+  ctx.save();ctx.translate(bird.x,bird.y);
+  ctx.fillStyle=birdColor;
+  ctx.beginPath();ctx.ellipse(0,0,bird.width/2,bird.height/2,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#fdd835";
+  ctx.beginPath();ctx.ellipse(-5,0,10,7,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#f57c00";
+  ctx.beginPath();ctx.moveTo(bird.width/2-5,0);
+  ctx.lineTo(bird.width/2+10,5);ctx.lineTo(bird.width/2+10,-5);ctx.closePath();ctx.fill();
+  ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(10,-8,6,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#000";ctx.beginPath();ctx.arc(12,-8,2,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+function makePipe(){
+  const top=Math.random()*(canvas.height/2),gap=180;
+  pipes.push({x:canvas.width,width:90,top:top,bottom:top+gap,passed:false});
+}
+function drawPipes(){
+  pipes.forEach(p=>{
+    ctx.fillStyle="#2ecc71";
+    ctx.fillRect(p.x,0,p.width,p.top);
+    ctx.fillRect(p.x,p.bottom,p.width,canvas.height-p.bottom);
+    ctx.fillStyle="#27ae60";
+    ctx.fillRect(p.x,p.top-20,p.width,20);
+    ctx.fillRect(p.x,p.bottom,p.width,20);
+  });
+}
+function updatePipes(){
+  if(frame%90===0)makePipe();
+  pipes.forEach(p=>p.x-=3);
+  pipes=pipes.filter(p=>p.x+p.width>0);
+}
+function detectCollision(){
+  for(let p of pipes){
+    if(bird.x+bird.width/2>p.x&&bird.x-bird.width/2<p.x+p.width&&
+       (bird.y-bird.height/2<p.top||bird.y+bird.height/2>p.bottom)){gameOver=true;}
+  }
+  if(bird.y+bird.height/2>canvas.height||bird.y-bird.height/2<0)gameOver=true;
+}
+function drawScore(){
+  ctx.fillStyle="#333";ctx.font="bold 40px Arial";
+  ctx.fillText("Score: "+score,20,50);
+  ctx.fillText("Best: "+bestScore,20,100);
+}
+function updateScore(){
+  pipes.forEach(p=>{
+    if(!p.passed&&p.x+p.width<bird.x){score++;p.passed=true;}
+  });
+}
+function resetGame(){
+  pipes=[];score=0;frame=0;bird.y=canvas.height/2;bird.vel=0;gameOver=false;
+  document.getElementById("restart").style.display="none";
+  started=true;paused=false;
+  document.getElementById("pause").textContent="⏸️";
+  loop();
+}
+
+function loop(){
+  if(!started)return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(paused){
+    ctx.fillStyle="rgba(0,0,0,0.5)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#fff";ctx.font="bold 60px Arial";
+    ctx.fillText("Paused",canvas.width/2-110,canvas.height/2);
+    requestAnimationFrame(loop);
+    return;
+  }
+
+  if(gameOver){
+    ctx.fillStyle="rgba(0,0,0,.5)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="#fff";
+    ctx.font="bold 60px Arial";
+    ctx.fillText("Game Over!",canvas.width/2-170,canvas.height/2-40);
+    ctx.font="30px Arial";
+    ctx.fillText("Score: "+score,canvas.width/2-50,canvas.height/2+10);
+    if(score>bestScore){bestScore=score;localStorage.setItem("bestScore",bestScore);}
+    document.getElementById("restart").style.display="block";
+    return;
+  }
+
+  bird.vel+=bird.gravity;bird.y+=bird.vel;
+  updatePipes();detectCollision();updateScore();
+  drawPipes();drawBird();drawScore();
+  frame++;requestAnimationFrame(loop);
+}
+
+function jump(){if(!gameOver&&started&&!paused)bird.vel=bird.lift;}
+document.addEventListener("touchstart",()=>{
+  if(!started){started=true;document.getElementById("start").style.display="none";loop();}
+  else jump();
+});
+window.addEventListener("keydown",e=>{
+  if(e.code==="Space"){if(!started){started=true;document.getElementById("start").style.display="none";loop();}
+  else jump();}
+});
+document.getElementById("restart").onclick=resetGame;
+
+document.getElementById("pause").onclick=()=>{
+  if(!started||gameOver)return;
+  paused=!paused;
+  document.getElementById("pause").textContent=paused?"▶️":"⏸️";
+  if(!paused)loop();
+};
+loop();
+</script>
+</body>
+</html>
